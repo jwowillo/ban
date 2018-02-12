@@ -64,35 +64,30 @@ func StderrErrorHandler(err error) {
 	fmt.Fprintf(os.Stderr, "%v\n", err)
 }
 
-// New ...
-func New(hh http.Handler, banner Banner, cfg Config) http.Handler {
-	h := &handler{
-		handler: hh,
-		banner:  banner,
-		config:  cfg,
-		ips:     newIPMap(),
+// Handler ...
+func Handler(h http.Handler, banner Banner, cfg Config) http.Handler {
+	hn := &handler{handler: h, banner: banner, config: cfg, ips: newIPMap()}
+	if hn.config.ErrorHandler == nil {
+		hn.config.ErrorHandler = StderrErrorHandler
 	}
-	if h.config.ErrorHandler == nil {
-		h.config.ErrorHandler = StderrErrorHandler
-	}
-	if h.config.Store != "" {
-		ips, err := loadBans(h.config.Store)
+	if hn.config.Store != "" {
+		ips, err := loadBans(hn.config.Store)
 		if err != nil {
-			h.config.ErrorHandler(err)
+			hn.config.ErrorHandler(err)
 			ips = newIPMap()
 		}
-		h.ips = ips
+		hn.ips = ips
 		c := make(chan os.Signal, 2)
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 		go func() {
 			<-c
-			if err := h.clean(); err != nil {
-				h.config.ErrorHandler(err)
+			if err := hn.clean(); err != nil {
+				hn.config.ErrorHandler(err)
 			}
 			os.Exit(1)
 		}()
 	}
-	return h
+	return hn
 }
 
 func (h *handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {

@@ -20,6 +20,6 @@ var (
 func TestBan(t *testing.T) {
 	http.ListenAndServe(
 		":8080",
-		ban.New(Handler, Banner, ban.Config{Store: "out.txt"}),
+		ban.Handler(Handler, Banner, ban.Config{Store: "out.txt"}),
 	)
 }
