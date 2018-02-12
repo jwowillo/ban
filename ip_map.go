@@ -5,30 +5,33 @@ import (
 	"net"
 )
 
-// TODO: When all of the bit choices at a level are banned, mark the parent as
-// the end and delete the children. This can help optimize space complexity
-// further. Extend this to the saved ban list by rewriting with the proper
-// prefix lengths.
-// TODO: Add mutexes
-
+// bitsPerByte is the number of bits in a byte.
 const bitsPerByte = 8
 
-// ErrPrefixLength ...
-var ErrPrefixLength = errors.New("invalid prefix-length for IP")
+// ErrPrefixLength is returned if a prefix-Length too long is passed for an
+// IP address.
+var ErrPrefixLength = errors.New("invalid prefix-Length for IP")
 
+// node in a trie.
+//
+// Stores the address legnth if the node marks an address end.
 type node struct {
-	length   byte
-	children [2]*node
+	Length   byte
+	Children [2]*node
 }
 
+// ipMap is a trie which supports adding net.IPs and prefix lengths and checking
+// for their presence efficiently.
 type ipMap struct {
 	root *node
 }
 
+// newIPMap creates an empty ipMap.
 func newIPMap() *ipMap {
 	return &ipMap{root: &node{}}
 }
 
+// Add the part of the net.IP specified by the prefix-length to the ipMap.
 func (m *ipMap) Add(ip net.IP, prefixLength byte) error {
 	ipLen := byte(len(ip)) * bitsPerByte
 	if prefixLength > ipLen {
@@ -37,62 +40,72 @@ func (m *ipMap) Add(ip net.IP, prefixLength byte) error {
 	current := m.root
 	for i := byte(0); i < prefixLength; i++ {
 		child := bitAtIndex(ip, i)
-		if current.children[child] == nil {
-			current.children[child] = &node{}
+		if current.Children[child] == nil {
+			current.Children[child] = &node{}
 		}
-		current = current.children[child]
-		if current.length != 0 {
+		current = current.Children[child]
+		if current.Length != 0 {
 			return nil
 		}
 	}
-	current.length = ipLen
+	current.Length = ipLen
 	return nil
 }
 
+// Has returns true if the net.IP matches a net.IP and prefix-length stored in
+// ipMap.
 func (m *ipMap) Has(ip net.IP) bool {
 	current := m.root
 	ipLen := byte(len(ip)) * bitsPerByte
 	for i := byte(0); i < ipLen; i++ {
-		current = current.children[bitAtIndex(ip, i)]
+		current = current.Children[bitAtIndex(ip, i)]
 		if current == nil {
 			break
 		}
-		if current.length == ipLen {
+		if current.Length == ipLen {
 			return true
 		}
 	}
 	return false
 }
 
-type ipPair struct {
-	IP           net.IP
-	PrefixLength byte
-}
-
+// IPs returns all net.IP and prefix-length pairs stored in the ipMap.
 func (m *ipMap) IPs() []ipPair {
 	var out []ipPair
 	findIPs(m.root, nil, &out)
 	return out
 }
 
+// ipPair is a pair of a net.IP and a prefix-length.
+type ipPair struct {
+	IP           net.IP
+	PrefixLength byte
+}
+
+// findIPs is a recursive helper function which finds all corresponding ipPairs
+// from the passed node and stores them in out.
+//
+// path is meant to be initially passed as nil and is used to build the
+// addresses.
 func findIPs(n *node, path []byte, out *[]ipPair) {
-	if n.length != 0 {
-		ip := make(net.IP, n.length/bitsPerByte)
-		for i := byte(0); i < n.length; i++ {
+	if n.Length != 0 {
+		ip := make(net.IP, n.Length/bitsPerByte)
+		for i := byte(0); i < n.Length; i++ {
 			j := i / bitsPerByte
 			ip[j] = ip[j] | path[i]<<(bitsPerByte-1-i%bitsPerByte)
 		}
-		*out = append(*out, ipPair{IP: ip, PrefixLength: n.length})
+		*out = append(*out, ipPair{IP: ip, PrefixLength: n.Length})
 		return
 	}
-	if n.children[0] != nil {
-		findIPs(n.children[0], append(path, 0), out)
+	if n.Children[0] != nil {
+		findIPs(n.Children[0], append(path, 0), out)
 	}
-	if n.children[1] != nil {
-		findIPs(n.children[1], append(path, 1), out)
+	if n.Children[1] != nil {
+		findIPs(n.Children[1], append(path, 1), out)
 	}
 }
 
+// bitAtIndex returns the ith bit in the net.IP.
 func bitAtIndex(ip net.IP, i byte) byte {
 	return (ip[i/bitsPerByte] >> (bitsPerByte - 1 - i%bitsPerByte)) & 1
 }
