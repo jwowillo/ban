@@ -27,8 +27,8 @@ func Handle(rw http.ResponseWriter, r *http.Request) {
 }
 
 func Example() {
-	banner := ban.BannerFunc(Ban)
 	handler := http.HandlerFunc(Handle)
+	banner := ban.BannerFunc(Ban)
 	http.ListenAndServe(
 		":8080",
 		ban.New(handler, banner, ban.DefaultConfig),

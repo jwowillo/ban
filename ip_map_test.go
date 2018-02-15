@@ -32,7 +32,7 @@ func testPartialPrefix(t *testing.T, c ipMapConstructor) {
 	t.Parallel()
 	const n = 100
 	m := c()
-	m.Add(net.ParseIP("0.0.0.0"), 24)
+	m.Add(net.ParseIP("0.0.0.0"), 120)
 	m.Add(net.ParseIP("::0"), 120)
 	for i := 0; i < 256; i++ {
 		ip1 := net.ParseIP(fmt.Sprintf("0.0.0.%d", i))
@@ -69,7 +69,7 @@ func testFullPrefix(t *testing.T, c ipMapConstructor) {
 	m := c()
 	ip1 := net.ParseIP("255.255.255.255")
 	ip2 := net.ParseIP("::0")
-	m.Add(ip1, 32)
+	m.Add(ip1, 128)
 	m.Add(ip2, 128)
 	if !m.Has(ip1) {
 		t.Errorf("m.Has(%v) = false, want true", ip1)
@@ -98,8 +98,8 @@ func testIPv4IPv6Different(t *testing.T, c ipMapConstructor) {
 	ipv6Zero := net.ParseIP("::0")
 	ipv4Full := net.ParseIP("255.255.255.255")
 	ipv6Full := net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
-	m1.Add(ipv4Zero, 32)
-	m1.Add(ipv4Full, 32)
+	m1.Add(ipv4Zero, 128)
+	m1.Add(ipv4Full, 128)
 	if m1.Has(ipv6Zero) {
 		t.Errorf("m.Has(%v) = true, want false", ipv6Zero)
 	}
@@ -128,7 +128,7 @@ func testRandom(t *testing.T, c ipMapConstructor) {
 	}
 	m := c()
 	for _, ip := range ips {
-		m.Add(ip, byte(len(ip)*bitsPerByte))
+		m.Add(ip, 128)
 	}
 	for _, ip := range ips {
 		if !m.Has(ip) {
@@ -145,7 +145,7 @@ func testMalformedAndBadPrefixLength(t *testing.T, c ipMapConstructor) {
 	badPrefixLength := net.ParseIP("::1")
 	m := c()
 	m.Add(badIP, byte(len(badIP)*bitsPerByte))
-	m.Add(badPrefixLength, byte(len(badPrefixLength)*bitsPerByte)+1)
+	m.Add(badPrefixLength, 128+1)
 	m.Add(nil, 0)
 	if m.Has(badIP) {
 		t.Errorf("m.Has(%v) = true, want false", badIP)
@@ -169,7 +169,7 @@ func benchmarkAdd(b *testing.B, c ipMapConstructor) {
 	m := c()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		m.Add(ips[i%len(ips)], byte(len(ips)*bitsPerByte))
+		m.Add(ips[i%len(ips)], 128)
 	}
 }
 
@@ -182,7 +182,7 @@ func benchmarkHas(b *testing.B, c ipMapConstructor) {
 	}
 	m := c()
 	for _, ip := range ips {
-		m.Add(ip, byte(len(ips)*bitsPerByte))
+		m.Add(ip, 128)
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -191,9 +191,12 @@ func benchmarkHas(b *testing.B, c ipMapConstructor) {
 }
 
 // isEqualIP returns true if a and b are the same net.IP.
+//
+// Both net.IPs are expected to be 16-byte addresses.
 func isEqualIP(a, b net.IP) bool {
-	a = padTo16(a)
-	b = padTo16(b)
+	if len(a) != len(b) {
+		return false
+	}
 	for i := range a {
 		if a[i] != b[i] {
 			return false
@@ -212,6 +215,9 @@ func randomIP() net.IP {
 	}
 	for i := range ip {
 		ip[i] = byte(rand.Uint32() % 0xFF)
+	}
+	if len(ip) == ipv4Length {
+		ip = append(ipv4Prefix, ip...)
 	}
 	return ip
 }

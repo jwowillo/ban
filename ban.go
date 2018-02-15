@@ -1,5 +1,9 @@
 // Package ban provides an http.Handler wrapper which allows a bans to be issued
-// and supports efficiently adding, checking, and storing them.
+// to IP addresses and supports efficiently adding, checking, and storing them.
+//
+// All IP addresses handled within the package are treated as 16-byte addresses.
+// IPv4 addresses are padded to 16 bytes, if necessary, with the prefix
+// "::ffff".
 //
 // Adding and checking the bans is constant time bounded by the length of the
 // part of the longest IP address being banned. Memory use is minimized by not
@@ -28,7 +32,9 @@ func StderrErrorHandler(err error) {
 // Ban which is issued by a Banner.
 //
 // The Ban can either not ban, ban an IP address, or ban a range of addresses by
-// specifying the prefix-length of bits in the IP address which matter.
+// specifying the prefix-length of bits in the IP address which matter. IP
+// addresses handled by this package are always 16 bytes so the prefix-length
+// should correspond to a 16-byte address.
 //
 // An empty Ban bans every address and shouldn't be used unless that is the
 // desired behavior. DefaultBan bans only the address which made the request. A
@@ -48,6 +54,9 @@ var (
 )
 
 // Banner issues bans to net.IPs based on http.Requests.
+//
+// net.IPs passed from this package will always be 16 bytes long. IPv4 addresses
+// are padded to 16 bytes if necessary with the prefix "::ffff".
 type Banner interface {
 	Ban(net.IP, *http.Request) Ban
 }
@@ -114,7 +123,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	if ban := h.banner.Ban(ip, r); ban != NoBan {
 		var pl byte
 		if ban.shouldBanIP {
-			pl = byte(len(ip)) * bitsPerByte
+			pl = ipLength
 		} else {
 			pl = ban.PrefixLength
 		}
@@ -151,9 +160,8 @@ func parseIP(addr string) net.IP {
 		return nil
 	}
 	ip := net.ParseIP(host)
-	as4 := ip.To4()
-	if as4 != nil {
-		return as4
+	if len(ip) == ipv4Length {
+		ip = append(ipv4Prefix, ip...)
 	}
 	return ip
 }
@@ -174,12 +182,12 @@ func loadBans(store string) (ipMap, error) {
 		if len(line) == 0 {
 			continue
 		}
-		_, ip, err := net.ParseCIDR(string(line))
+		ip, mask, err := net.ParseCIDR(string(line))
 		if err != nil {
 			return nil, err
 		}
-		pl, _ := ip.Mask.Size()
-		ips.Add(ip.IP, byte(pl))
+		pl, _ := mask.Mask.Size()
+		ips.Add(ip, byte(pl))
 	}
 	return ips, nil
 }
@@ -192,10 +200,11 @@ func writeBan(rw http.ResponseWriter, ip net.IP) {
 // ipMap is a structure that efficiently supports adding of net.IPs and
 // prefix-lengths and membership checking of net.IPs.
 //
-// IPv4 addresses that are padded to IPv6 length should be treated as IPv4
-// addresses.
+// All passed addresses can be assumed to be 16 bytes with prefix-lengths in
+// terms of 16-byte addresses. IPv4 addresses are padded to 16 bytes, if
+// necessary, with the prefix "::ffff".
 //
-// Malformed addresses and prefix-lengths are expected to not be added.
+// Malformed addresses and prefix-lengths shouldn't be added.
 type ipMap interface {
 	Add(net.IP, byte)
 	Has(net.IP) bool

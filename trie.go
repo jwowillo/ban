@@ -42,22 +42,16 @@ func newTrie() *trie {
 
 // Add the part of the net.IP specified by the prefix-length to the trie.
 //
-// The prefix-length should be in terms of the IP address type, not length. For
-// example, even if an IPv4 address is padded to 16 bytes, the prefix-length
-// should be as if it were 4 bytes long.
+// The prefix-length should be in terms of a 16-byte address.
 //
 // Malformed or nil addresses and invalid prefix-lengths are ignored.
 func (m *trie) Add(ip net.IP, prefixLength byte) {
-	if ip == nil || len(ip) != ipv4Length && len(ip) != ipv6Length {
+	if ip == nil || len(ip) != ipv6Length {
 		return
-	}
-	if isIPv4(ip) {
-		prefixLength += (ipv6Length - ipv4Length) * bitsPerByte
 	}
 	if prefixLength > ipLength {
 		return
 	}
-	ip = padTo16(ip)
 	current := m.root
 	for i := byte(0); i < prefixLength; i++ {
 		child := bitAtIndex(ip, i)
@@ -77,10 +71,9 @@ func (m *trie) Add(ip net.IP, prefixLength byte) {
 //
 // False is returned if the address is malformed or nil.
 func (m *trie) Has(ip net.IP) bool {
-	if ip == nil || len(ip) != ipv4Length && len(ip) != ipv6Length {
+	if ip == nil || len(ip) != ipv6Length {
 		return false
 	}
-	ip = padTo16(ip)
 	current := m.root
 	for i := byte(0); i < ipLength; i++ {
 		if current.IsEnd {
@@ -97,21 +90,4 @@ func (m *trie) Has(ip net.IP) bool {
 // bitAtIndex returns the ith bit in the net.IP.
 func bitAtIndex(ip net.IP, i byte) byte {
 	return (ip[i/bitsPerByte] >> (bitsPerByte - 1 - i%bitsPerByte)) & 1
-}
-
-// isIPv4 returns true if the net.IP is IPv4.
-func isIPv4(ip net.IP) bool {
-	as4 := ip.To4()
-	if as4 == nil {
-		return false
-	}
-	return true
-}
-
-// padTo16 pads the net.IP to 16 bytes.
-func padTo16(ip net.IP) net.IP {
-	if len(ip) == ipv4Length {
-		return append(ipv4Prefix, ip...)
-	}
-	return ip
 }
