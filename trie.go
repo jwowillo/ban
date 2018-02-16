@@ -1,9 +1,5 @@
 package ban
 
-import (
-	"net"
-)
-
 // node in a trie.
 type node struct {
 	// IsEnd is true if this node is the last relevant node in the search
@@ -24,21 +20,13 @@ func newTrie() *trie {
 	return &trie{root: &node{}}
 }
 
-// Add the part of the net.IP specified by the prefix-length to the trie.
-//
-// The prefix-length should be in terms of a 16-byte address.
-//
-// Malformed or nil addresses and invalid prefix-lengths are ignored.
-func (m *trie) Add(ip net.IP, prefixLength byte) {
-	if ip == nil || len(ip) != ipv6Length {
-		return
-	}
-	if prefixLength > ipLength {
-		return
-	}
+// Add the PrefixedIP to the trie.
+func (m *trie) Add(pip *PrefixedIP) {
+	ip := pip.IP()
+	pl := pip.PrefixLength()
 	current := m.root
-	for i := byte(0); i < prefixLength; i++ {
-		child := bitAtIndex(ip, i)
+	for i := byte(0); i < pl; i++ {
+		child := (ip[i/bitsPerByte] >> (bitsPerByte - 1 - i%bitsPerByte)) & 1
 		if current.Children[child] == nil {
 			current.Children[child] = &node{}
 		}
@@ -50,28 +38,18 @@ func (m *trie) Add(ip net.IP, prefixLength byte) {
 	current.IsEnd = true
 }
 
-// Has returns true if the net.IP matches a net.IP and prefix-length stored in
-// the trie.
-//
-// False is returned if the address is malformed or nil.
-func (m *trie) Has(ip net.IP) bool {
-	if ip == nil || len(ip) != ipv6Length {
-		return false
-	}
+// Has returns true if the IP matches a PrefixedIP stored in the trie.
+func (m *trie) Has(ip IP) bool {
 	current := m.root
 	for i := byte(0); i < ipLength; i++ {
 		if current.IsEnd {
 			return true
 		}
-		current = current.Children[bitAtIndex(ip, i)]
+		child := (ip[i/bitsPerByte] >> (bitsPerByte - 1 - i%bitsPerByte)) & 1
+		current = current.Children[child]
 		if current == nil {
 			break
 		}
 	}
 	return current != nil && current.IsEnd
-}
-
-// bitAtIndex returns the ith bit in the net.IP.
-func bitAtIndex(ip net.IP, i byte) byte {
-	return (ip[i/bitsPerByte] >> (bitsPerByte - 1 - i%bitsPerByte)) & 1
 }

@@ -3,45 +3,64 @@ package ban
 import (
 	"fmt"
 	"math/rand"
-	"net"
 	"testing"
 	"time"
 )
+
+// TODO: IPv4 constructor.
 
 // ipMapConstructor constructs an ipMap.
 type ipMapConstructor func() ipMap
 
 // testEmptyPrefix tests that an ipMap constructed by the ipMapConstructor
-// correctly handles a prefix-length of 0 that includes every address.
+// correctly handles a prefix-length of 0 that includes every IP.
 func testEmptyPrefix(t *testing.T, c ipMapConstructor) {
 	t.Parallel()
 	const n = 100
 	m := c()
-	m.Add(net.ParseIP("::0"), 0)
+	pip, err := ParsePrefixedIP("::/0")
+	if err != nil {
+		t.Error(err)
+	}
+	m.Add(pip)
 	for i := 0; i < n; i++ {
 		ip := randomIP()
 		if !m.Has(ip) {
-			t.Errorf("m.Has(%v) = false, want true", ip)
+			t.Errorf("m.Has(%s) = false, want true", ip)
 		}
 	}
 }
 
 // testPartialPrefix tests that an ipMap constructed by the ipMapConstructor
-// correctly handles prefix-lengths that include some addresses.
+// correctly handles prefix-lengths that include some IPs.
 func testPartialPrefix(t *testing.T, c ipMapConstructor) {
 	t.Parallel()
 	const n = 100
 	m := c()
-	m.Add(net.ParseIP("0.0.0.0"), 120)
-	m.Add(net.ParseIP("::0"), 120)
+	pip1, err := ParsePrefixedIP("0.0.0.0/120")
+	if err != nil {
+		t.Error(err)
+	}
+	m.Add(pip1)
+	pip2, err := ParsePrefixedIP("::/120")
+	if err != nil {
+		t.Error(err)
+	}
+	m.Add(pip2)
 	for i := 0; i < 256; i++ {
-		ip1 := net.ParseIP(fmt.Sprintf("0.0.0.%d", i))
-		if !m.Has(ip1) {
-			t.Errorf("m.Has(%v) = false, want true", ip1)
+		ip1, err := ParseIP(fmt.Sprintf("0.0.0.%d", i))
+		if err != nil {
+			t.Error(err)
 		}
-		ip2 := net.ParseIP(fmt.Sprintf("::%x", i))
+		if !m.Has(ip1) {
+			t.Errorf("m.Has(%s) = false, want true", ip1)
+		}
+		ip2, err := ParseIP(fmt.Sprintf("::%x", i))
+		if err != nil {
+			t.Error(err)
+		}
 		if !m.Has(ip2) {
-			t.Errorf("m.Has(%v) = false, want true", ip2)
+			t.Errorf("m.Has(%s) = false, want true", ip2)
 		}
 	}
 	for i := 0; i < n; i++ {
@@ -56,64 +75,82 @@ func testPartialPrefix(t *testing.T, c ipMapConstructor) {
 			continue
 		}
 		if m.Has(ip) {
-			t.Errorf("m.Has(%v) = true, want false", ip)
+			t.Errorf("m.Has(%s) = true, want false", ip)
 		}
 	}
 }
 
 // testFullPrefix tests that an ipMap constructed by the ipMapConstructor
-// correctly handles prefix-lengths that include only one address.
+// correctly handles prefix-lengths that include only one IP.
 func testFullPrefix(t *testing.T, c ipMapConstructor) {
 	t.Parallel()
 	const n = 100
 	m := c()
-	ip1 := net.ParseIP("255.255.255.255")
-	ip2 := net.ParseIP("::0")
-	m.Add(ip1, 128)
-	m.Add(ip2, 128)
-	if !m.Has(ip1) {
-		t.Errorf("m.Has(%v) = false, want true", ip1)
+	pip1, err := ParsePrefixedIP("255.255.255.255/128")
+	if err != nil {
+		t.Error(err)
 	}
-	if !m.Has(ip2) {
-		t.Errorf("m.Has(%v) = false, want true", ip2)
+	pip2, err := ParsePrefixedIP("::/128")
+	if err != nil {
+		t.Error(err)
+	}
+	m.Add(pip1)
+	m.Add(pip2)
+	if !m.Has(pip1.IP()) {
+		t.Errorf("m.Has(%s) = false, want true", pip1.IP())
+	}
+	if !m.Has(pip2.IP()) {
+		t.Errorf("m.Has(%s) = false, want true", pip2.IP())
 	}
 	for i := 0; i < n; i++ {
 		ip := randomIP()
-		if isEqualIP(ip, ip1) || isEqualIP(ip, ip2) {
+		if isEqualIP(ip, pip1.IP()) || isEqualIP(ip, pip2.IP()) {
 			continue
 		}
 		if m.Has(ip) {
-			t.Errorf("m.Has(%v) = true, want false", ip)
+			t.Errorf("m.Has(%s) = true, want false", ip)
 		}
 	}
 }
 
 // testIPv4IPv6Different tests that an ipMap constructed by the ipMapConstructor
-// correctly handles IPv4 and IPv6 addresses that have the same byte values,
-// either all 0 or all 0xFF.
+// correctly handles IPv4 and IPv6 IPs that have the same byte values, either
+// all 0 or all 0xFF.
 func testIPv4IPv6Different(t *testing.T, c ipMapConstructor) {
 	t.Parallel()
 	m1 := c()
-	ipv4Zero := net.ParseIP("0.0.0.0")
-	ipv6Zero := net.ParseIP("::0")
-	ipv4Full := net.ParseIP("255.255.255.255")
-	ipv6Full := net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
-	m1.Add(ipv4Zero, 128)
-	m1.Add(ipv4Full, 128)
-	if m1.Has(ipv6Zero) {
-		t.Errorf("m.Has(%v) = true, want false", ipv6Zero)
+	ipv4Zero, err := ParsePrefixedIP("0.0.0.0/128")
+	if err != nil {
+		t.Error(err)
 	}
-	if m1.Has(ipv6Full) {
-		t.Errorf("m.Has(%v) = true, want false", ipv6Full)
+	ipv6Zero, err := ParsePrefixedIP("::/128")
+	if err != nil {
+		t.Error(err)
+	}
+	ipv4Full, err := ParsePrefixedIP("255.255.255.255/128")
+	if err != nil {
+		t.Error(err)
+	}
+	ipv6Full, err := ParsePrefixedIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")
+	if err != nil {
+		t.Error(err)
+	}
+	m1.Add(ipv4Zero)
+	m1.Add(ipv4Full)
+	if m1.Has(ipv6Zero.IP()) {
+		t.Errorf("m.Has(%s) = true, want false", ipv6Zero.IP())
+	}
+	if m1.Has(ipv6Full.IP()) {
+		t.Errorf("m.Has(%s) = true, want false", ipv6Full.IP())
 	}
 	m2 := c()
-	m2.Add(ipv6Zero, 128)
-	m2.Add(ipv6Full, 128)
-	if m2.Has(ipv4Zero) {
-		t.Errorf("m.Has(%v) = true, want false", ipv4Zero)
+	m2.Add(ipv6Zero)
+	m2.Add(ipv6Full)
+	if m2.Has(ipv4Zero.IP()) {
+		t.Errorf("m.Has(%s) = true, want false", ipv4Zero.IP())
 	}
-	if m2.Has(ipv4Full) {
-		t.Errorf("m.Has(%v) = true, want false", ipv4Full)
+	if m2.Has(ipv4Full.IP()) {
+		t.Errorf("m.Has(%s) = true, want false", ipv4Full.IP())
 	}
 }
 
@@ -122,39 +159,22 @@ func testIPv4IPv6Different(t *testing.T, c ipMapConstructor) {
 func testRandom(t *testing.T, c ipMapConstructor) {
 	t.Parallel()
 	const n = 100
-	ips := make([]net.IP, n)
+	ips := make([]IP, n)
 	for i := 0; i < n; i++ {
 		ips[i] = randomIP()
 	}
 	m := c()
 	for _, ip := range ips {
-		m.Add(ip, 128)
+		pip, err := NewPrefixedIP(ip, 128)
+		if err != nil {
+			t.Error(err)
+		}
+		m.Add(pip)
 	}
 	for _, ip := range ips {
 		if !m.Has(ip) {
-			t.Errorf("m.Has(%v) = false, want true", ip)
+			t.Errorf("m.Has(%s) = false, want true", ip)
 		}
-	}
-}
-
-// testMalformed tests that an ipMap constructed by the ipMapConstructor
-// correctly handles malformed addresses and bad prefix-lengths.
-func testMalformedAndBadPrefixLength(t *testing.T, c ipMapConstructor) {
-	t.Parallel()
-	badIP := net.IP([]byte{0xFF})
-	badPrefixLength := net.ParseIP("::1")
-	m := c()
-	m.Add(badIP, byte(len(badIP)*bitsPerByte))
-	m.Add(badPrefixLength, 128+1)
-	m.Add(nil, 0)
-	if m.Has(badIP) {
-		t.Errorf("m.Has(%v) = true, want false", badIP)
-	}
-	if m.Has(badPrefixLength) {
-		t.Errorf("m.Has(%v) = true, want false", badPrefixLength)
-	}
-	if m.Has(nil) {
-		t.Errorf("m.Has(%v) = true, want false", nil)
 	}
 }
 
@@ -162,27 +182,37 @@ func testMalformedAndBadPrefixLength(t *testing.T, c ipMapConstructor) {
 // ipMapConstructor.
 func benchmarkAdd(b *testing.B, c ipMapConstructor) {
 	const n = 10000
-	ips := make([]net.IP, n)
+	ips := make([]*PrefixedIP, n)
 	for i := range ips {
-		ips[i] = randomIP()
+		pip, err := NewPrefixedIP(randomIP(), ipLength)
+		if err != nil {
+			b.Error(err)
+		}
+		ips[i] = pip
 	}
 	m := c()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		m.Add(ips[i%len(ips)], 128)
+		m.Add(ips[i%len(ips)])
 	}
 }
 
 // benchmarkHas benchmarks Has of an ipMap constructed by the ipMapConstructor.
 func benchmarkHas(b *testing.B, c ipMapConstructor) {
 	const n = 10000
-	ips := make([]net.IP, n)
+	pips := make([]*PrefixedIP, n)
+	ips := make([]IP, n)
 	for i := range ips {
-		ips[i] = randomIP()
+		pip, err := NewPrefixedIP(randomIP(), ipLength)
+		if err != nil {
+			b.Error(err)
+		}
+		pips[i] = pip
+		ips[i] = pip.IP()
 	}
 	m := c()
-	for _, ip := range ips {
-		m.Add(ip, 128)
+	for _, ip := range pips {
+		m.Add(ip)
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -190,34 +220,23 @@ func benchmarkHas(b *testing.B, c ipMapConstructor) {
 	}
 }
 
-// isEqualIP returns true if a and b are the same net.IP.
-//
-// Both net.IPs are expected to be 16-byte addresses.
-func isEqualIP(a, b net.IP) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
+// isEqualIP returns true if a and b are the same IP.
+func isEqualIP(a, b IP) bool {
+	return a == b
 }
 
-// randomIP returns a random net.IP which can be either IPv4 or IPv6.
-func randomIP() net.IP {
-	var ip net.IP
+// randomIP returns a random IP which can be either IPv4 or IPv6.
+func randomIP() IP {
+	var ip IP
 	if rand.Intn(2) == 0 {
-		ip = make([]byte, ipv4Length)
+		ip = ipv4Prefix
+		for i := 12; i < ipv6Length; i++ {
+			ip[i] = byte(rand.Uint32() % 0xFF)
+		}
 	} else {
-		ip = make([]byte, ipv6Length)
-	}
-	for i := range ip {
-		ip[i] = byte(rand.Uint32() % 0xFF)
-	}
-	if len(ip) == ipv4Length {
-		ip = append(ipv4Prefix, ip...)
+		for i := range ip {
+			ip[i] = byte(rand.Uint32() % 0xFF)
+		}
 	}
 	return ip
 }

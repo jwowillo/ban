@@ -2,7 +2,6 @@ package ban_test
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 
 	"github.com/jwowillo/ban"
@@ -13,8 +12,8 @@ func IsMalicious(r *http.Request) bool {
 	return false // This can be anything.
 }
 
-// Ban the net.IP if the http.Request is malicious.
-func Ban(ip net.IP, r *http.Request) ban.Ban {
+// Ban the ban.IP if the http.Request is malicious.
+func Ban(ip ban.IP, r *http.Request) ban.Ban {
 	if IsMalicious(r) {
 		return ban.DefaultBan
 	}

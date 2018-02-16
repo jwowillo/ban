@@ -34,11 +34,6 @@ func TestRandom(t *testing.T) {
 	testRandom(t, trieConstructor)
 }
 
-// TestMalformed calls testMalformedAndBadPrefixLength with trieConstructor.
-func TestMalformedAndBadPrefixLength(t *testing.T) {
-	testMalformedAndBadPrefixLength(t, trieConstructor)
-}
-
 // BenchmarkAdd calls benchmarkAdd with trieConstructor.
 func BenchmarkAdd(b *testing.B) {
 	benchmarkAdd(b, trieConstructor)
