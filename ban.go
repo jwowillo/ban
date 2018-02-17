@@ -1,11 +1,11 @@
-// Package ban provides an http.Handler wrapper which allows a bans to be issued
-// to IP addresses and supports efficiently adding, checking, and storing them.
+// Package ban is an http.Handler wrapper which allows a Banner to issue Bans
+// and supports efficiently adding, checking, and storing them.
 //
-// Adding and checking the bans is constant time bounded by the larger of the
-// prefix-length beingg added or the IP length. Memory use is minimized by not
-// restoring duplicate address parts.
+// Adding and checking the bans is constant-time bounded by the larger of the
+// prefix-length being added or the IP-length. Memory use is minimized by not
+// restoring duplicate address-parts.
 //
-// Existing bans can be loaded into the Handler with new bans being saved.
+// Existing Bans can be loaded into the Handler with new Bans being saved.
 package ban
 
 import (
@@ -25,15 +25,14 @@ func StderrErrorHandler(err error) {
 	fmt.Fprintf(os.Stderr, "%v\n", err)
 }
 
-// Ban which is issued by a Banner.
-//
-// The Ban can either not ban, ban an IP , or ban a range of IPs by specifying
+// Ban which can either not ban, ban an IP, or ban a range of IPs by specifying
 // the prefix-length of bits in the IP which matter.
 //
-// An empty Ban bans every address and shouldn't be used unless that is the
-// desired behavior. DefaultBan bans only the address which made the request. A
-// Ban with a specified PrefixLength bans a range of addresses where the parts
-// of the address not covered by the prefix-length can be anything.
+// An empty Ban bans every IP and shouldn't be used unless that is the desired
+// behavior. IPBan bans only the IP which made the http.Request. A Ban with a
+// specified prefix-length bans a range of IPs where the bits after the
+// prefix-length are ignored when comparing each IP to the one which made the
+// http.Request.
 type Ban struct {
 	PrefixLength byte
 	shouldntBan  bool
@@ -41,8 +40,8 @@ type Ban struct {
 }
 
 var (
-	// DefaultBan bans only the IP which made the request.
-	DefaultBan = Ban{shouldBanIP: true}
+	// IPBan bans only the IP which made the request.
+	IPBan = Ban{shouldBanIP: true}
 	// NoBan doesn't ban.
 	NoBan = Ban{shouldntBan: true}
 )
@@ -62,7 +61,7 @@ func (f BannerFunc) Ban(ip IP, r *http.Request) Ban {
 
 // Config for the wrapper.
 type Config struct {
-	// Store is name of file to load and store bans into.
+	// Store is name of file to load and store Bans into.
 	//
 	// Doesn't load or store if not assigned.
 	Store string
@@ -72,10 +71,10 @@ type Config struct {
 	ErrorHandler ErrorHandler
 }
 
-// DefaultConfig which doesn't load or store bans and uses StderrErrorHandler.
+// DefaultConfig which doesn't load or store Bans and uses StderrErrorHandler.
 var DefaultConfig = Config{}
 
-// Handler is the wrapping http.Handler which tracks bans.
+// Handler is the wrapping http.Handler which tracks Bans.
 type Handler struct {
 	Handler http.Handler
 	banner  Banner
@@ -83,9 +82,8 @@ type Handler struct {
 	ips     ipMap
 }
 
-// New creates a Handler that wraps the http.Handler to check for bans issued by
-// the Banner before responding to http.Requests with behavior customized by
-// Config.
+// New Handler that wraps the http.Handler to check for Bans issued by the
+// Banner before responding to http.Requests with behavior customized by Config.
 func New(h http.Handler, banner Banner, cfg Config) *Handler {
 	hn := &Handler{Handler: h, banner: banner, config: cfg, ips: newTrie()}
 	if hn.config.ErrorHandler == nil {
@@ -199,7 +197,7 @@ func writeBan(rw http.ResponseWriter, ip IP) {
 	fmt.Fprintf(rw, "%s is banned", ip)
 }
 
-// writeError ...
+// writeError to the http.ResponseWriter.
 func writeError(rw http.ResponseWriter, err error) {
 	fmt.Fprintf(rw, "%s", err)
 }

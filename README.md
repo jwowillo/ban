@@ -1,6 +1,6 @@
 # `ban`
 
-`ban` is an `http.Handler` wrapper which allows a callback to issue bans and
+`ban` is an `http.Handler` wrapper which allows a `Banner` to issue bans and
 supports efficiently adding, checking, and storing them.
 
 ## Installing

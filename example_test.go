@@ -15,12 +15,12 @@ func IsMalicious(r *http.Request) bool {
 // Ban the ban.IP if the http.Request is malicious.
 func Ban(ip ban.IP, r *http.Request) ban.Ban {
 	if IsMalicious(r) {
-		return ban.DefaultBan
+		return ban.IPBan
 	}
 	return ban.NoBan
 }
 
-// Handle the http.Request by writing response to the http.ResponseWriter.
+// Handle the http.Request by writing "response" to the http.ResponseWriter.
 func Handle(rw http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(rw, "response")
 }

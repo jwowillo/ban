@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// TODO: IPv4 constructor.
-
 // ipMapConstructor constructs an ipMap.
 type ipMapConstructor func() ipMap
 
