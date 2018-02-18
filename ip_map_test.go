@@ -24,7 +24,7 @@ func testEmptyPrefix(t *testing.T, c ipMapConstructor) {
 	for i := 0; i < n; i++ {
 		ip := randomIP()
 		if !m.Has(ip) {
-			t.Errorf("m.Has(%s) = false, want true", ip)
+			t.Errorf("m.Has(%v) = false, want true", ip)
 		}
 	}
 }
@@ -51,14 +51,14 @@ func testPartialPrefix(t *testing.T, c ipMapConstructor) {
 			t.Error(err)
 		}
 		if !m.Has(ip1) {
-			t.Errorf("m.Has(%s) = false, want true", ip1)
+			t.Errorf("m.Has(%v) = false, want true", ip1)
 		}
 		ip2, err := ParseIP(fmt.Sprintf("::%x", i))
 		if err != nil {
 			t.Error(err)
 		}
 		if !m.Has(ip2) {
-			t.Errorf("m.Has(%s) = false, want true", ip2)
+			t.Errorf("m.Has(%v) = false, want true", ip2)
 		}
 	}
 	for i := 0; i < n; i++ {
@@ -73,7 +73,7 @@ func testPartialPrefix(t *testing.T, c ipMapConstructor) {
 			continue
 		}
 		if m.Has(ip) {
-			t.Errorf("m.Has(%s) = true, want false", ip)
+			t.Errorf("m.Has(%v) = true, want false", ip)
 		}
 	}
 }
@@ -95,10 +95,10 @@ func testFullPrefix(t *testing.T, c ipMapConstructor) {
 	m.Add(pip1)
 	m.Add(pip2)
 	if !m.Has(pip1.IP()) {
-		t.Errorf("m.Has(%s) = false, want true", pip1.IP())
+		t.Errorf("m.Has(%v) = false, want true", pip1.IP())
 	}
 	if !m.Has(pip2.IP()) {
-		t.Errorf("m.Has(%s) = false, want true", pip2.IP())
+		t.Errorf("m.Has(%v) = false, want true", pip2.IP())
 	}
 	for i := 0; i < n; i++ {
 		ip := randomIP()
@@ -106,7 +106,7 @@ func testFullPrefix(t *testing.T, c ipMapConstructor) {
 			continue
 		}
 		if m.Has(ip) {
-			t.Errorf("m.Has(%s) = true, want false", ip)
+			t.Errorf("m.Has(%v) = true, want false", ip)
 		}
 	}
 }
@@ -136,19 +136,36 @@ func testIPv4IPv6Different(t *testing.T, c ipMapConstructor) {
 	m1.Add(ipv4Zero)
 	m1.Add(ipv4Full)
 	if m1.Has(ipv6Zero.IP()) {
-		t.Errorf("m.Has(%s) = true, want false", ipv6Zero.IP())
+		t.Errorf("m.Has(%v) = true, want false", ipv6Zero.IP())
 	}
 	if m1.Has(ipv6Full.IP()) {
-		t.Errorf("m.Has(%s) = true, want false", ipv6Full.IP())
+		t.Errorf("m.Has(%v) = true, want false", ipv6Full.IP())
 	}
 	m2 := c()
 	m2.Add(ipv6Zero)
 	m2.Add(ipv6Full)
 	if m2.Has(ipv4Zero.IP()) {
-		t.Errorf("m.Has(%s) = true, want false", ipv4Zero.IP())
+		t.Errorf("m.Has(%v) = true, want false", ipv4Zero.IP())
 	}
 	if m2.Has(ipv4Full.IP()) {
-		t.Errorf("m.Has(%s) = true, want false", ipv4Full.IP())
+		t.Errorf("m.Has(%v) = true, want false", ipv4Full.IP())
+	}
+}
+
+// testIPExists thats that an ipMap constructed by the ipMapConstructor handles
+// the same IP being added more than once.
+func testIPExists(t *testing.T, c ipMapConstructor) {
+	t.Parallel()
+	ip := NewIPv4IP(IPv4{1, 2, 3, 4})
+	pip, err := NewPrefixedIP(ip, ipLength)
+	if err != nil {
+		t.Error(err)
+	}
+	m := c()
+	m.Add(pip)
+	m.Add(pip)
+	if !m.Has(pip.IP()) {
+		t.Errorf("m.Has(%v) = false, want true", pip.IP())
 	}
 }
 
@@ -171,7 +188,7 @@ func testRandom(t *testing.T, c ipMapConstructor) {
 	}
 	for _, ip := range ips {
 		if !m.Has(ip) {
-			t.Errorf("m.Has(%s) = false, want true", ip)
+			t.Errorf("m.Has(%v) = false, want true", ip)
 		}
 	}
 }

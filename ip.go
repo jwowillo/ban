@@ -24,23 +24,28 @@ var (
 	ErrBadIP = errors.New("bad IP")
 	// ErrBadPrefixedIP is return if a bad PrefixedIP form is given.
 	ErrBadPrefixedIP = errors.New("bad prefixed IP")
-	// ErrInvalidPrefixLength is given if a bad prefix-length is given.
-	ErrInvalidPrefixLength = errors.New(
-		"prefix-length must be an integer less than or equal to 128",
-	)
+	// ErrBadPrefixLength is given if a bad prefix-length is given.
+	ErrBadPrefixLength = errors.New("prefix-length must be an integer less than or equal to 128")
 )
 
-// IP address in 16-byte IPv6 form.
+// IPv4 is a 4-byte IP.
+type IPv4 [ipv4Length]byte
+
+// IPv6 is a 6-byte IP.
+type IPv6 [ipv6Length]byte
+
+// IP address in standard 16-byte IPv6 form.
 //
 // IPv4 addresses have the prefix "::ffff" to pad them to 16 bytes.
-type IP [ipv6Length]byte
+type IP IPv6
 
 // ipv4Prefix is the standard prefix prepended to IPv4 addresses to pad them to
 // IP length.
 var ipv4Prefix = IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff}
 
-// NewIPv4 creates an IP with the given IPv4 bytes appended to the IPv4-prefix.
-func NewIPv4(addr [ipv4Length]byte) IP {
+// NewIPv4IP creates an IP with the given IPv4 bytes appended to the
+// IPv4-prefix.
+func NewIPv4IP(addr IPv4) IP {
 	ip := ipv4Prefix
 	for i := (ipv6Length - ipv4Length); i < ipv6Length; i++ {
 		ip[i] = addr[i-(ipv6Length-ipv4Length)]
@@ -77,12 +82,12 @@ type PrefixedIP struct {
 // NewPrefixedIP where the relevant bits from the IP are included.
 //
 // The prefix-length must be greater than or equal to 0 and less than or equal
-// to 128, since that is the number of bits in an IPv6 address.
+// to 128, since that is the number of bits in an IP.
 //
 // Returns an error if an invalid prefix-length is given.
 func NewPrefixedIP(ip IP, pl byte) (*PrefixedIP, error) {
 	if pl > ipLength {
-		return nil, ErrInvalidPrefixLength
+		return nil, ErrBadPrefixLength
 	}
 	return &PrefixedIP{ip: ip, prefixLength: pl}, nil
 }
@@ -102,10 +107,10 @@ func ParsePrefixedIP(pip string) (*PrefixedIP, error) {
 	}
 	pl, err := strconv.Atoi(split[1])
 	if err != nil {
-		return nil, ErrInvalidPrefixLength
+		return nil, ErrBadPrefixLength
 	}
-	if pl > ipLength {
-		return nil, ErrInvalidPrefixLength
+	if pl < 0 || pl > ipLength {
+		return nil, ErrBadPrefixLength
 	}
 	return NewPrefixedIP(ip, byte(pl))
 }

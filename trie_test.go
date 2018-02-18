@@ -34,6 +34,11 @@ func TestRandom(t *testing.T) {
 	testRandom(t, trieConstructor)
 }
 
+// TestIPExists calls testIPExists with trieConstructor.
+func TestIPExists(t *testing.T) {
+	testIPExists(t, trieConstructor)
+}
+
 // BenchmarkAdd calls benchmarkAdd with trieConstructor.
 func BenchmarkAdd(b *testing.B) {
 	benchmarkAdd(b, trieConstructor)
