@@ -9,9 +9,7 @@
 package ban
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -65,10 +63,10 @@ func (f BannerFunc) Ban(ip IP, r *http.Request) Ban {
 
 // Config for the wrapper.
 type Config struct {
-	// Store is name of file to load and store Bans into.
+	// StorePath is the name of file to load and store Bans into.
 	//
 	// Doesn't load or store if not assigned.
-	Store string
+	StorePath string
 	// ErrorHandler handles errors passed to it.
 	//
 	// Defaults to StderrErrorHandler if not assigned.
@@ -80,26 +78,35 @@ var DefaultConfig = Config{}
 
 // Handler is the wrapping http.Handler which tracks Bans.
 type Handler struct {
-	Handler http.Handler
-	banner  Banner
-	config  Config
-	ips     ipMap
+	handler      http.Handler
+	banner       Banner
+	ips          ipMap
+	errorHandler ErrorHandler
+	store        *store
 }
 
 // New Handler that wraps the http.Handler to check for Bans issued by the
 // Banner before responding to http.Requests with behavior customized by Config.
 func New(h http.Handler, banner Banner, cfg Config) *Handler {
-	hn := &Handler{Handler: h, banner: banner, config: cfg, ips: newTrie()}
-	if hn.config.ErrorHandler == nil {
-		hn.config.ErrorHandler = StderrErrorHandler
+	var store *store
+	if cfg.StorePath != "" {
+		store = newStore(cfg.StorePath)
 	}
-	if hn.config.Store != "" {
-		ips, err := loadPrefixedIPs(hn.config.Store)
-		if err != nil {
-			ips = newTrie()
-			hn.config.ErrorHandler(err)
+	errorHandler := cfg.ErrorHandler
+	if errorHandler == nil {
+		errorHandler = StderrErrorHandler
+	}
+	hn := &Handler{
+		handler:      h,
+		banner:       banner,
+		ips:          newTrie(),
+		errorHandler: errorHandler,
+		store:        store,
+	}
+	if hn.store != nil {
+		if err := hn.loadPrefixedIPs(); err != nil {
+			hn.errorHandler(err)
 		}
-		hn.ips = ips
 	}
 	return hn
 }
@@ -110,7 +117,7 @@ func New(h http.Handler, banner Banner, cfg Config) *Handler {
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	ip, err := parseRemoteAddress(r.RemoteAddr)
 	if err != nil {
-		h.config.ErrorHandler(err)
+		h.errorHandler(err)
 		writeError(rw, err)
 		return
 	}
@@ -127,35 +134,41 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		}
 		pip, err := NewPrefixedIP(ip, pl)
 		if err != nil {
-			h.config.ErrorHandler(err)
+			h.errorHandler(err)
 			writeBan(rw, ip)
 			return
 		}
 		h.ips.Add(pip)
-		if h.config.Store != "" {
-			if err := writePrefixedIP(
-				h.config.Store,
-				pip,
-			); err != nil {
-				h.config.ErrorHandler(err)
+		if h.store != nil {
+			if err := h.writePrefixedIP(pip); err != nil {
+				h.errorHandler(err)
 			}
 		}
 		writeBan(rw, ip)
 		return
 	}
-	h.Handler.ServeHTTP(rw, r)
+	h.handler.ServeHTTP(rw, r)
 }
 
-// writePrefixedIP to file at path.
+// writePrefixedIP to the store.
 //
-// Returns an error if the file couldn't be opened.
-func writePrefixedIP(path string, ip *PrefixedIP) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
+// Returns any error that happened during writing.
+func (h *Handler) writePrefixedIP(pip *PrefixedIP) error {
+	return h.store.Add(pip)
+}
+
+// loadPrefixedIPs from the store and return an ipMap containing the
+// PrefixedIPs.
+//
+// Returns any error that happened during loading.
+func (h *Handler) loadPrefixedIPs() error {
+	pips, err := h.store.PrefixedIPs()
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	fmt.Fprintf(f, "%s\n", ip)
+	for _, pip := range pips {
+		h.ips.Add(pip)
+	}
 	return nil
 }
 
@@ -168,32 +181,6 @@ func parseRemoteAddress(addr string) (IP, error) {
 		return IP{}, ErrBadIP
 	}
 	return ParseIP(host)
-}
-
-// loadPrefixedIPs from file at path store and return an ipMap containing the
-// PrefixedIPs.
-//
-// Returns an error if the file couldn't be read.
-func loadPrefixedIPs(store string) (ipMap, error) {
-	ips := newTrie()
-	bs, err := ioutil.ReadFile(store)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return ips, nil
-		}
-		return nil, err
-	}
-	for _, line := range bytes.Split(bs, []byte("\n")) {
-		if len(line) == 0 {
-			continue
-		}
-		pip, err := ParsePrefixedIP(string(line))
-		if err != nil {
-			return nil, err
-		}
-		ips.Add(pip)
-	}
-	return ips, nil
 }
 
 // writeBan writes that the IP is banned to the http.ResponseWriter.

@@ -52,7 +52,7 @@ func TestBanBadStore(t *testing.T) {
 	testHandler(
 		t,
 		New(h, b, Config{
-			Store: "bad_store.txt",
+			StorePath: "bad_store.txt",
 			ErrorHandler: func(err error) {
 				called = true
 			},
@@ -76,23 +76,23 @@ func TestBanStore(t *testing.T) {
 	b := BannerFunc(func(ip IP, r *http.Request) Ban { return IPBan })
 	testHandler(
 		t,
-		New(h, b, Config{Store: "store.txt"}),
+		New(h, b, Config{StorePath: "store.txt"}),
 		"0.0.0.0", "0.0.0.0 is banned", http.StatusForbidden,
 	)
 	testHandler(
 		t,
-		New(h, b, Config{Store: "store.txt"}),
+		New(h, b, Config{StorePath: "store.txt"}),
 		"1.1.1.1", "1.1.1.1 is banned", http.StatusForbidden,
 	)
 	b = BannerFunc(func(ip IP, r *http.Request) Ban { return NoBan })
 	testHandler(
 		t,
-		New(h, b, Config{Store: "store.txt"}),
+		New(h, b, Config{StorePath: "store.txt"}),
 		"0.0.0.0", "0.0.0.0 is banned", http.StatusForbidden,
 	)
 	testHandler(
 		t,
-		New(h, b, Config{Store: "store.txt"}),
+		New(h, b, Config{StorePath: "store.txt"}),
 		"1.1.1.1", "1.1.1.1 is banned", http.StatusForbidden,
 	)
 }
