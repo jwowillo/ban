@@ -77,13 +77,23 @@ func TestBanStore(t *testing.T) {
 	testHandler(
 		t,
 		New(h, b, Config{Store: "store.txt"}),
-		"1.2.3.4", "1.2.3.4 is banned", http.StatusForbidden,
+		"0.0.0.0", "0.0.0.0 is banned", http.StatusForbidden,
+	)
+	testHandler(
+		t,
+		New(h, b, Config{Store: "store.txt"}),
+		"1.1.1.1", "1.1.1.1 is banned", http.StatusForbidden,
 	)
 	b = BannerFunc(func(ip IP, r *http.Request) Ban { return NoBan })
 	testHandler(
 		t,
 		New(h, b, Config{Store: "store.txt"}),
-		"1.2.3.4", "1.2.3.4 is banned", http.StatusForbidden,
+		"0.0.0.0", "0.0.0.0 is banned", http.StatusForbidden,
+	)
+	testHandler(
+		t,
+		New(h, b, Config{Store: "store.txt"}),
+		"1.1.1.1", "1.1.1.1 is banned", http.StatusForbidden,
 	)
 }
 

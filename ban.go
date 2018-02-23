@@ -150,7 +150,7 @@ func (h *Handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 //
 // Returns an error if the file couldn't be opened.
 func writePrefixedIP(path string, ip *PrefixedIP) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0777)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		return err
 	}
