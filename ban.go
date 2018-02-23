@@ -20,6 +20,10 @@ import (
 // ErrorHandler handles passed errors.
 type ErrorHandler func(error)
 
+// IgnoreErrorHandler ignores errors.
+func IgnoreErrorHandler(err error) {
+}
+
 // StderrErrorHandler writes the error to stderr.
 func StderrErrorHandler(err error) {
 	fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -40,7 +44,7 @@ type Ban struct {
 }
 
 var (
-	// IPBan bans only the IP which made the request.
+	// IPBan bans only the IP which made the http.Request.
 	IPBan = Ban{shouldBanIP: true}
 	// NoBan doesn't ban.
 	NoBan = Ban{shouldntBan: true}
@@ -175,7 +179,7 @@ func loadPrefixedIPs(store string) (ipMap, error) {
 	bs, err := ioutil.ReadFile(store)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return ips, nil
 		}
 		return nil, err
 	}
@@ -194,11 +198,13 @@ func loadPrefixedIPs(store string) (ipMap, error) {
 
 // writeBan writes that the IP is banned to the http.ResponseWriter.
 func writeBan(rw http.ResponseWriter, ip IP) {
-	fmt.Fprintf(rw, "%s is banned", ip)
+	rw.WriteHeader(http.StatusForbidden)
+	fmt.Fprintf(rw, fmt.Sprintf("%v is banned", ip))
 }
 
 // writeError to the http.ResponseWriter.
 func writeError(rw http.ResponseWriter, err error) {
+	rw.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(rw, "%s", err)
 }
 
